@@ -1,4 +1,5 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
     package="com.appleeducate.fluttermidiexample">
 
     <!-- The INTERNET permission is required for development. Specifically,
@@ -15,7 +16,9 @@
     <application
         android:name="io.flutter.app.FlutterApplication"
         android:label="flutter_midi_example"
-        android:icon="@mipmap/ic_launcher">
+        tools:replace="android:label"
+        android:icon="@mipmap/ic_launcher"
+        tools:ignore="GoogleAppIndexingWarning">
         <activity
             android:name=".MainActivity"
             android:launchMode="singleTop"

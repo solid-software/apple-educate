@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 
 import 'package:flutter/services.dart';
@@ -22,6 +23,29 @@ class FlutterMidi {
     print("Result: $result");
     return result;
   }
+
+  /// Needed to play midi notes from file presented as [Uint8List]
+  static Future<void> playFile({@required Uint8List midiData}){
+    return _channel.invokeMethod("play_midi_file", {"midi_file" : midiData});
+  }
+
+  /// Needed to get notified when widi file reaches it's end
+  static void onFileEnd(@required VoidCallback onFileEnded) async{
+    await _channel.invokeMethod('on_file_end');
+    onFileEnded();
+  }
+
+  /// Needed to stop playind midi notes from file and reset midi processor
+  static void stopPlayingFile() async{
+     await _channel.invokeMethod("stop_playing");
+     await _channel.invokeMethod("reset_processor");
+  }
+
+  /// Needed to pause playing midi notes from file
+  static void pausePlayingFile() async{
+    await _channel.invokeMethod("stop_playing");
+  }
+
 
   /// Needed so that the sound font is loaded
   /// On iOS make sure to include the sound_font.SF2 in the Runner folder.
