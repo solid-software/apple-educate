@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 
 import 'package:flutter/services.dart';
+import 'package:flutter_midi/model/midi_event.dart';
 import 'local_storage.dart';
 
 class FlutterMidi {
@@ -12,8 +13,7 @@ class FlutterMidi {
   /// Needed so that the sound font is loaded
   /// On iOS make sure to include the sound_font.SF2 in the Runner folder.
   /// This does not work in the simulator.
-  static Future<String> prepare(
-      {@required ByteData sf2, String name = "instrument.sf2"}) async {
+  static Future<String> prepare({@required ByteData sf2, String name = "instrument.sf2"}) async {
     File _file = await writeToFile(sf2, name: name);
 
     final Map<dynamic, dynamic> mapData = <dynamic, dynamic>{};
@@ -25,27 +25,35 @@ class FlutterMidi {
   }
 
   /// Needed to play midi notes from file presented as [Uint8List]
-  static Future<void> playFile({@required Uint8List midiData}){
-    return _channel.invokeMethod("play_midi_file", {"midi_file" : midiData});
+  static Future<void> playFile({@required Uint8List midiData}) {
+    return _channel.invokeMethod("play_midi_file", {"midi_file": midiData});
   }
 
   /// Needed to get notified when widi file reaches it's end
-  static void onFileEnd(@required VoidCallback onFileEnded) async{
+  static void onFileEnd(@required VoidCallback onFileEnded) async {
     await _channel.invokeMethod('on_file_end');
     onFileEnded();
   }
 
   /// Needed to stop playind midi notes from file and reset midi processor
-  static void stopPlayingFile() async{
-     await _channel.invokeMethod("stop_playing");
-     await _channel.invokeMethod("reset_processor");
+  static Future<void> stopPlayingFile() async {
+    await _channel.invokeMethod("stop_playing");
+    await _channel.invokeMethod("reset_processor");
   }
 
   /// Needed to pause playing midi notes from file
-  static void pausePlayingFile() async{
+  static Future<void> pausePlayingFile() async {
     await _channel.invokeMethod("stop_playing");
   }
 
+  /// Creates midi event stream
+  static Stream<MidiEvent> onMidiEvent() {
+    EventChannel _eventChannel = EventChannel('midi_event_channel');
+
+    return _eventChannel
+        .receiveBroadcastStream()
+        .map((midiEventJson) => MidiEvent.fromJson(midiEventJson));
+  }
 
   /// Needed so that the sound font is loaded
   /// On iOS make sure to include the sound_font.SF2 in the Runner folder.
@@ -76,8 +84,7 @@ class FlutterMidi {
     final Map<dynamic, dynamic> mapData = <dynamic, dynamic>{};
     print("Pressed: $midi");
     mapData["note"] = midi;
-    final String result =
-        await _channel.invokeMethod('stop_midi_note', mapData);
+    final String result = await _channel.invokeMethod('stop_midi_note', mapData);
     return result;
   }
 

@@ -8,6 +8,7 @@ import com.pdrogfer.mididroid.event.meta.EndOfTrack;
 import com.pdrogfer.mididroid.util.MidiEventListener;
 import com.pdrogfer.mididroid.util.MidiProcessor;
 
+import io.flutter.plugin.common.EventChannel;
 import io.flutter.plugin.common.MethodChannel;
 import io.flutter.plugin.common.MethodChannel.Result;
 import io.flutter.plugin.common.PluginRegistry.Registrar;
@@ -16,6 +17,8 @@ import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.HashMap;
+import java.util.Map;
 
 import cn.sherlock.com.sun.media.sound.SF2Soundbank;
 import cn.sherlock.com.sun.media.sound.SoftSynthesizer;
@@ -30,19 +33,30 @@ import jp.kshoji.javax.sound.midi.ShortMessage;
 /**
  * FlutterMidiPlugin
  */
-public class FlutterMidiPlugin implements MethodCallHandler, MidiEventListener {
+
+public class FlutterMidiPlugin implements MethodCallHandler, MidiEventListener, EventChannel.StreamHandler {
     private SoftSynthesizer synth;
     private Receiver recv;
     private int lastPlayedNote = 0;
     private MidiProcessor midiProcessor;
     private Result methodResult;
+    private MidiEventListener midiEventListener;
+
+
+    public FlutterMidiPlugin() {
+        System.out.println("new instance of class");
+    }
 
     /**
      * Plugin registration.
      */
     public static void registerWith(Registrar registrar) {
         final MethodChannel channel = new MethodChannel(registrar.messenger(), "flutter_midi");
-        channel.setMethodCallHandler(new FlutterMidiPlugin());
+        FlutterMidiPlugin midiPlugin = new FlutterMidiPlugin();
+        channel.setMethodCallHandler(midiPlugin);
+
+        final EventChannel eventChannel = new EventChannel(registrar.messenger(), "midi_event_channel");
+        eventChannel.setStreamHandler(midiPlugin);
     }
 
     @Override
@@ -103,6 +117,7 @@ public class FlutterMidiPlugin implements MethodCallHandler, MidiEventListener {
                 InputStream midiInputStream = new ByteArrayInputStream(midiData);
                 MidiFile midiFile = new MidiFile(midiInputStream);
                 if (midiProcessor == null) {
+
                     midiProcessor = new MidiProcessor(midiFile);
                 }
                 midiProcessor.registerEventListener(this, NoteOn.class);
@@ -129,11 +144,12 @@ public class FlutterMidiPlugin implements MethodCallHandler, MidiEventListener {
                 midiProcessor.stop();
             }
             result.success(true);
-        }else if (call.method.equals("reset_processor")){
+        } else if (call.method.equals("reset_processor")) {
             if (midiProcessor != null) {
                 midiProcessor.reset();
                 midiProcessor = null;
             }
+            result.success(null);
         }
     }
 
@@ -177,6 +193,48 @@ public class FlutterMidiPlugin implements MethodCallHandler, MidiEventListener {
             }
         } catch (InvalidMidiDataException e) {
             e.printStackTrace();
+        }
+    }
+
+
+
+    @Override
+    public void onListen(Object o, EventChannel.EventSink eventSink) {
+        final EventChannel.EventSink midiEventSink = eventSink;
+         midiEventListener = new MidiEventListener() {
+            @Override
+            public void onStart(boolean b) {
+
+            }
+
+            @Override
+            public void onEvent(MidiEvent midiEvent, long l) {
+                if (midiEvent instanceof NoteOn) {
+                    Map<String, Integer> resultMap = new HashMap<>();
+                    resultMap.put("noteState", 0);
+                    resultMap.put("midiNote", ((NoteOn) midiEvent).getNoteValue());
+                    midiEventSink.success(resultMap);
+                } else if (midiEvent instanceof NoteOff) {
+                    Map<String, Integer> resultMap = new HashMap<>();
+                    resultMap.put("noteState", 1);
+                    resultMap.put("midiNote", ((NoteOff) midiEvent).getNoteValue());
+                    midiEventSink.success(resultMap);
+                }
+            }
+
+            @Override
+            public void onStop(boolean b) {
+
+            }
+        };
+        System.out.println(midiProcessor);
+        midiProcessor.registerEventListener(midiEventListener, MidiEvent.class);
+    }
+
+    @Override
+    public void onCancel(Object o) {
+        if (midiEventListener != null && midiProcessor != null) {
+            midiProcessor.unregisterEventListener(midiEventListener);
         }
     }
 }
