@@ -55,6 +55,12 @@ class FlutterMidi {
         .map((midiEventJson) => MidiEvent.fromJson(midiEventJson));
   }
 
+  /// Fetches all notes from midi file
+  static Future<List<int>> getNotesFormFile(Uint8List midiFile) async{
+    var notesList = await _channel.invokeMethod("get_notes", {'midi_file' : midiFile});
+    return List<int>.from(notesList);
+  }
+
   /// Needed so that the sound font is loaded
   /// On iOS make sure to include the sound_font.SF2 in the Runner folder.
   /// This does not work in the simulator.

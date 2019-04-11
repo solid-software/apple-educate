@@ -17,7 +17,9 @@ import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import cn.sherlock.com.sun.media.sound.SF2Soundbank;
@@ -150,6 +152,25 @@ public class FlutterMidiPlugin implements MethodCallHandler, MidiEventListener, 
                 midiProcessor = null;
             }
             result.success(null);
+        } else if (call.method.equals("get_notes")) {
+            byte[] midiData = call.argument("midi_file");
+            try {
+                InputStream midiFileInputStream = new ByteArrayInputStream(midiData);
+                MidiFile midiFile = new MidiFile(midiFileInputStream);
+                List<Integer> midiNotes = new ArrayList<>();
+                int midiTracksCount = midiFile.getTrackCount();
+                if (midiTracksCount > 0) {
+                    Object[] midiEvents = midiFile.getTracks().get(midiTracksCount - 1).getEvents().toArray();
+                    for (Object event : midiEvents){
+                        if (event instanceof NoteOn){
+                            midiNotes.add(((NoteOn) event).getNoteValue());
+                        }
+                    }
+                }
+                result.success(midiNotes);
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
         }
     }
 
@@ -197,11 +218,10 @@ public class FlutterMidiPlugin implements MethodCallHandler, MidiEventListener, 
     }
 
 
-
     @Override
     public void onListen(Object o, EventChannel.EventSink eventSink) {
         final EventChannel.EventSink midiEventSink = eventSink;
-         midiEventListener = new MidiEventListener() {
+        midiEventListener = new MidiEventListener() {
             @Override
             public void onStart(boolean b) {
 
