@@ -31,6 +31,11 @@ import jp.kshoji.javax.sound.midi.MidiUnavailableException;
 import jp.kshoji.javax.sound.midi.Receiver;
 import jp.kshoji.javax.sound.midi.ShortMessage;
 
+import org.jfugue.MusicStringParser;
+import org.jfugue.Note;
+import org.jfugue.ParserListenerAdapter;
+import org.jfugue.Pattern;
+
 
 /**
  * FlutterMidiPlugin
@@ -171,6 +176,13 @@ public class FlutterMidiPlugin implements MethodCallHandler, MidiEventListener, 
             } catch (IOException e) {
                 e.printStackTrace();
             }
+        }else if (call.method.equals("get_note_value")){
+            String noteString  = call.argument("note_string");
+            NoteEventListener parserListener = new NoteEventListener(result);
+            MusicStringParser parser = new MusicStringParser();
+            parser.addParserListener(parserListener);
+            Pattern pattern = new Pattern(noteString);
+            parser.parse(pattern);
         }
     }
 

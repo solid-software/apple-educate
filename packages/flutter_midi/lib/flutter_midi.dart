@@ -82,6 +82,10 @@ class FlutterMidi {
     return result;
   }
 
+  static Future<int> getNoteValue(String note){
+    return _channel.invokeMethod('get_note_value', {'note_string': note});
+  }
+
   /// Use this when stopping the sound onTouchUp or to cancel a long file.
   /// Not needed if playing midi onTap.
   static Future<String> stopMidiNote({

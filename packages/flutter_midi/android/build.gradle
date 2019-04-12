@@ -6,6 +6,9 @@ buildscript {
         google()
         jcenter()
         maven { url "https://jitpack.io" }
+        maven { url "https://jitpack.io" }
+        maven { url 'https://github.com/kshoji/JFugue-for-Android/raw/master/jfugue-android/snapshot' }
+        maven { url 'https://github.com/kshoji/USB-MIDI-Driver/raw/master/MIDIDriver/snapshots' }
     }
 
     dependencies {
@@ -18,6 +21,8 @@ rootProject.allprojects {
         google()
         jcenter()
         maven { url "https://jitpack.io" }
+        maven { url 'https://github.com/kshoji/JFugue-for-Android/raw/master/jfugue-android/snapshot' }
+        maven { url 'https://github.com/kshoji/USB-MIDI-Driver/raw/master/MIDIDriver/snapshots' }
     }
 }
 
@@ -39,4 +44,5 @@ android {
 dependencies {
     implementation 'com.github.appleeducate:MidiDriver-Android-SF2:1.0'
     compile 'com.github.pdrogfer:MidiDroid:v1.0'
+    compile 'jp.kshoji:jfugue-android:4.0.3:@aar'
 }
