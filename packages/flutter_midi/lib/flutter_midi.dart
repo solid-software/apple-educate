@@ -81,6 +81,10 @@ class FlutterMidi {
     final String result = await _channel.invokeMethod('unmute');
     return result;
   }
+  
+  static Future<void> changeVolumeLevel(int volumeLevel){
+    _channel.invokeMethod('change_volume_level', {'volume_level' : volumeLevel});
+  }
 
   static Future<int> getNoteValue(String note){
     return _channel.invokeMethod('get_note_value', {'note_string': note});

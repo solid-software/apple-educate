@@ -27,9 +27,11 @@ import cn.sherlock.com.sun.media.sound.SoftSynthesizer;
 import io.flutter.plugin.common.MethodCall;
 import io.flutter.plugin.common.MethodChannel.MethodCallHandler;
 import jp.kshoji.javax.sound.midi.InvalidMidiDataException;
+import jp.kshoji.javax.sound.midi.MidiMessage;
 import jp.kshoji.javax.sound.midi.MidiUnavailableException;
 import jp.kshoji.javax.sound.midi.Receiver;
 import jp.kshoji.javax.sound.midi.ShortMessage;
+import jp.kshoji.javax.sound.midi.MidiSystem;
 
 import org.jfugue.MusicStringParser;
 import org.jfugue.Note;
@@ -48,6 +50,7 @@ public class FlutterMidiPlugin implements MethodCallHandler, MidiEventListener, 
     private MidiProcessor midiProcessor;
     private Result methodResult;
     private MidiEventListener midiEventListener;
+    private double gain = 1.0;
 
 
     public FlutterMidiPlugin() {
@@ -183,6 +186,10 @@ public class FlutterMidiPlugin implements MethodCallHandler, MidiEventListener, 
             parser.addParserListener(parserListener);
             Pattern pattern = new Pattern(noteString);
             parser.parse(pattern);
+        }else if (call.method.equals("change_volume_level")){
+            int volumeLevel = call.argument("volume_level");
+            synth.getChannels()[0].controlChange(7, volumeLevel);
+            result.success(true);
         }
     }
 
