@@ -230,6 +230,7 @@ public class FlutterMidiPlugin implements MethodCallHandler, MidiEventListener, 
             recv.send(shortMessage, -1);
             if (methodResult != null) {
                 methodResult.success(true);
+                methodResult = null;
             }
         } catch (InvalidMidiDataException e) {
             e.printStackTrace();
