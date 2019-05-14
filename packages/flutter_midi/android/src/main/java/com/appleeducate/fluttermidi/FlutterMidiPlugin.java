@@ -1,5 +1,7 @@
 package com.appleeducate.fluttermidi;
 
+import android.os.AsyncTask;
+
 import com.pdrogfer.mididroid.MidiFile;
 import com.pdrogfer.mididroid.event.MidiEvent;
 import com.pdrogfer.mididroid.event.NoteOff;
@@ -72,21 +74,35 @@ public class FlutterMidiPlugin implements MethodCallHandler, MidiEventListener, 
     @Override
     public void onMethodCall(MethodCall call, Result result) {
         if (call.method.equals("prepare_midi")) {
-            try {
-                String _path = call.argument("path");
-                File _file = new File(_path);
-                SF2Soundbank sf = new SF2Soundbank(_file);
-                synth = new SoftSynthesizer();
-                synth.open();
-                synth.loadAllInstruments(sf);
-                synth.getChannels()[0].programChange(0);
-                synth.getChannels()[1].programChange(1);
-                recv = synth.getReceiver();
-            } catch (IOException e) {
-                e.printStackTrace();
-            } catch (MidiUnavailableException e) {
-                e.printStackTrace();
-            }
+            String path = call.argument("path");
+            final Result methodResult = result;
+            AsyncTask<String, String, String> task =  new AsyncTask<String, String, String>(){
+                @Override
+                protected String doInBackground(String... strings) {
+                    try {
+                        File _file = new File(strings[0]);
+                        SF2Soundbank sf = new SF2Soundbank(_file);
+                        synth = new SoftSynthesizer();
+                        synth.open();
+                        synth.loadAllInstruments(sf);
+                        synth.getChannels()[0].programChange(0);
+                        synth.getChannels()[1].programChange(1);
+                        recv = synth.getReceiver();
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    } catch (MidiUnavailableException e) {
+                        e.printStackTrace();
+                    }
+                    return null;
+                }
+
+                @Override
+                protected void onPostExecute(String string) {
+                    super.onPostExecute(string);
+                    methodResult.success(true);
+                }
+            };
+            task.execute(path);
         } else if (call.method.equals("change_sound")) {
             try {
                 String _path = call.argument("path");
@@ -98,6 +114,7 @@ public class FlutterMidiPlugin implements MethodCallHandler, MidiEventListener, 
                 synth.getChannels()[0].programChange(0);
                 synth.getChannels()[1].programChange(1);
                 recv = synth.getReceiver();
+                result.success(true);
             } catch (IOException e) {
                 e.printStackTrace();
             } catch (MidiUnavailableException e) {
@@ -109,6 +126,7 @@ public class FlutterMidiPlugin implements MethodCallHandler, MidiEventListener, 
                 ShortMessage msg = new ShortMessage();
                 msg.setMessage(ShortMessage.NOTE_ON, 0, _note, 127);
                 recv.send(msg, -1);
+                result.success(true);
             } catch (InvalidMidiDataException e) {
                 e.printStackTrace();
             }
@@ -118,6 +136,7 @@ public class FlutterMidiPlugin implements MethodCallHandler, MidiEventListener, 
                 ShortMessage msg = new ShortMessage();
                 msg.setMessage(ShortMessage.NOTE_OFF, 0, _note, 127);
                 recv.send(msg, -1);
+                result.success(true);
             } catch (InvalidMidiDataException e) {
                 e.printStackTrace();
             }

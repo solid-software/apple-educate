@@ -13,15 +13,13 @@ class FlutterMidi {
   /// Needed so that the sound font is loaded
   /// On iOS make sure to include the sound_font.SF2 in the Runner folder.
   /// This does not work in the simulator.
-  static Future<String> prepare({@required ByteData sf2, String name = "instrument.sf2"}) async {
+  static Future<bool> prepare({@required ByteData sf2, String name = "instrument.sf2"}) async {
     File _file = await writeToFile(sf2, name: name);
 
     final Map<dynamic, dynamic> mapData = <dynamic, dynamic>{};
     mapData["path"] = _file.path;
     print("Path => ${_file.path}");
-    final String result = await _channel.invokeMethod('prepare_midi', mapData);
-    print("Result: $result");
-    return result;
+    return _channel.invokeMethod('prepare_midi', mapData);
   }
 
   /// Needed to play midi notes from file presented as [Uint8List]
