@@ -1,11 +1,9 @@
 package com.appleeducate.fluttermidi;
 
-import android.annotation.SuppressLint;
 import android.os.AsyncTask;
 
 import com.pdrogfer.mididroid.MidiFile;
 import com.pdrogfer.mididroid.event.MidiEvent;
-import com.pdrogfer.mididroid.event.NoteAftertouch;
 import com.pdrogfer.mididroid.event.NoteOff;
 import com.pdrogfer.mididroid.event.NoteOn;
 import com.pdrogfer.mididroid.event.meta.EndOfTrack;
@@ -31,15 +29,12 @@ import cn.sherlock.com.sun.media.sound.SoftSynthesizer;
 import io.flutter.plugin.common.MethodCall;
 import io.flutter.plugin.common.MethodChannel.MethodCallHandler;
 import jp.kshoji.javax.sound.midi.InvalidMidiDataException;
-import jp.kshoji.javax.sound.midi.MidiMessage;
 import jp.kshoji.javax.sound.midi.MidiUnavailableException;
 import jp.kshoji.javax.sound.midi.Receiver;
 import jp.kshoji.javax.sound.midi.ShortMessage;
-import jp.kshoji.javax.sound.midi.MidiSystem;
+import jp.kshoji.javax.sound.midi.VoiceStatus;
 
 import org.jfugue.MusicStringParser;
-import org.jfugue.Note;
-import org.jfugue.ParserListenerAdapter;
 import org.jfugue.Pattern;
 
 
@@ -50,11 +45,9 @@ import org.jfugue.Pattern;
 public class FlutterMidiPlugin implements MethodCallHandler, MidiEventListener, EventChannel.StreamHandler {
     private SoftSynthesizer synth;
     private Receiver recv;
-    private int lastPlayedNote = 0;
     private MidiProcessor midiProcessor;
     private Result methodResult;
     private MidiEventListener midiEventListener;
-    private double gain = 1.0;
 
 
     public FlutterMidiPlugin() {
@@ -78,7 +71,7 @@ public class FlutterMidiPlugin implements MethodCallHandler, MidiEventListener, 
         if (call.method.equals("prepare_midi")) {
             String path = call.argument("path");
             final Result methodResult = result;
-            AsyncTask<String, String, String> task =  new AsyncTask<String, String, String>(){
+            AsyncTask<String, String, String> task = new AsyncTask<String, String, String>() {
                 @Override
                 protected String doInBackground(String... strings) {
                     try {
@@ -162,16 +155,27 @@ public class FlutterMidiPlugin implements MethodCallHandler, MidiEventListener, 
             methodResult = result;
         } else if (call.method.equals("stop_playing")) {
             if (midiProcessor != null && midiProcessor.isRunning()) {
+                midiProcessor.unregisterAllEventListeners();
+                midiProcessor.stop();
+                for (VoiceStatus status : synth.getVoiceStatus()) {
+                    if (!status.active) continue;
+
+                    ShortMessage noteOffMessage = new ShortMessage();
+                    try {
+                        noteOffMessage.setMessage(ShortMessage.NOTE_OFF, status.channel, status.note, 127);
+                        recv.send(noteOffMessage, -1);
+                    } catch (InvalidMidiDataException e) {
+                        e.printStackTrace();
+                    }
+                }
                 ShortMessage stopMessage = new ShortMessage();
                 try {
-                    stopMessage.setMessage(ShortMessage.NOTE_OFF, 0, lastPlayedNote, 127);
+                    stopMessage.setMessage(ShortMessage.STOP);
                     recv.send(stopMessage, -1);
                 } catch (InvalidMidiDataException e) {
                     e.printStackTrace();
                 }
 
-                midiProcessor.unregisterAllEventListeners();
-                midiProcessor.stop();
             }
             result.success(true);
         } else if (call.method.equals("reset_processor")) {
@@ -189,8 +193,8 @@ public class FlutterMidiPlugin implements MethodCallHandler, MidiEventListener, 
                 int midiTracksCount = midiFile.getTrackCount();
                 if (midiTracksCount > 0) {
                     Object[] midiEvents = midiFile.getTracks().get(midiTracksCount - 1).getEvents().toArray();
-                    for (Object event : midiEvents){
-                        if (event instanceof NoteOn){
+                    for (Object event : midiEvents) {
+                        if (event instanceof NoteOn) {
                             midiNotes.add(((NoteOn) event).getNoteValue());
                         }
                     }
@@ -199,14 +203,14 @@ public class FlutterMidiPlugin implements MethodCallHandler, MidiEventListener, 
             } catch (IOException e) {
                 e.printStackTrace();
             }
-        }else if (call.method.equals("get_note_value")){
-            String noteString  = call.argument("note_string");
+        } else if (call.method.equals("get_note_value")) {
+            String noteString = call.argument("note_string");
             NoteEventListener parserListener = new NoteEventListener(result);
             MusicStringParser parser = new MusicStringParser();
             parser.addParserListener(parserListener);
             Pattern pattern = new Pattern(noteString);
             parser.parse(pattern);
-        }else if (call.method.equals("change_volume_level")){
+        } else if (call.method.equals("change_volume_level")) {
             int volumeLevel = call.argument("volume_level");
             synth.getChannels()[0].controlChange(7, volumeLevel);
             result.success(true);
@@ -223,7 +227,6 @@ public class FlutterMidiPlugin implements MethodCallHandler, MidiEventListener, 
         if (midiEvent instanceof NoteOn) {
             NoteOn note = (NoteOn) midiEvent;
             ShortMessage startMessage = new ShortMessage();
-            lastPlayedNote = note.getNoteValue();
             try {
                 startMessage.setMessage(ShortMessage.NOTE_ON, 0, note.getNoteValue(), note.getVelocity());
                 recv.send(startMessage, -1);
@@ -245,7 +248,6 @@ public class FlutterMidiPlugin implements MethodCallHandler, MidiEventListener, 
     @Override
     public void onStop(boolean b) {
         try {
-            System.out.println("STOP");
             ShortMessage shortMessage = new ShortMessage();
             shortMessage.setMessage(ShortMessage.STOP);
             recv.send(shortMessage, -1);
@@ -278,7 +280,7 @@ public class FlutterMidiPlugin implements MethodCallHandler, MidiEventListener, 
                     if (note.getVelocity() != 0) {
                         resultMap.put("noteState", 0);
                         resultMap.put("midiNote", ((NoteOn) midiEvent).getNoteValue());
-                    }else {
+                    } else {
                         resultMap.put("noteState", 1);
                         resultMap.put("midiNote", ((NoteOn) midiEvent).getNoteValue());
                     }
