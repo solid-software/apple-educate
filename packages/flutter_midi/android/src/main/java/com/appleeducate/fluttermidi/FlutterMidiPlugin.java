@@ -1,9 +1,11 @@
 package com.appleeducate.fluttermidi;
 
+import android.annotation.SuppressLint;
 import android.os.AsyncTask;
 
 import com.pdrogfer.mididroid.MidiFile;
 import com.pdrogfer.mididroid.event.MidiEvent;
+import com.pdrogfer.mididroid.event.NoteAftertouch;
 import com.pdrogfer.mididroid.event.NoteOff;
 import com.pdrogfer.mididroid.event.NoteOn;
 import com.pdrogfer.mididroid.event.meta.EndOfTrack;
@@ -146,7 +148,6 @@ public class FlutterMidiPlugin implements MethodCallHandler, MidiEventListener, 
                 InputStream midiInputStream = new ByteArrayInputStream(midiData);
                 MidiFile midiFile = new MidiFile(midiInputStream);
                 if (midiProcessor == null) {
-
                     midiProcessor = new MidiProcessor(midiFile);
                 }
                 midiProcessor.registerEventListener(this, NoteOn.class);
@@ -221,8 +222,8 @@ public class FlutterMidiPlugin implements MethodCallHandler, MidiEventListener, 
     public void onEvent(MidiEvent midiEvent, long l) {
         if (midiEvent instanceof NoteOn) {
             NoteOn note = (NoteOn) midiEvent;
-            lastPlayedNote = note.getNoteValue();
             ShortMessage startMessage = new ShortMessage();
+            lastPlayedNote = note.getNoteValue();
             try {
                 startMessage.setMessage(ShortMessage.NOTE_ON, 0, note.getNoteValue(), note.getVelocity());
                 recv.send(startMessage, -1);
@@ -244,6 +245,7 @@ public class FlutterMidiPlugin implements MethodCallHandler, MidiEventListener, 
     @Override
     public void onStop(boolean b) {
         try {
+            System.out.println("STOP");
             ShortMessage shortMessage = new ShortMessage();
             shortMessage.setMessage(ShortMessage.STOP);
             recv.send(shortMessage, -1);
@@ -270,8 +272,16 @@ public class FlutterMidiPlugin implements MethodCallHandler, MidiEventListener, 
             public void onEvent(MidiEvent midiEvent, long l) {
                 if (midiEvent instanceof NoteOn) {
                     Map<String, Integer> resultMap = new HashMap<>();
-                    resultMap.put("noteState", 0);
-                    resultMap.put("midiNote", ((NoteOn) midiEvent).getNoteValue());
+                    NoteOn note = (NoteOn) midiEvent;
+                    // If there is a NoteOn event with zero velocity it acts as a NoteOff
+                    // event and that is why we should sent it to the flutter as a NoteOff event
+                    if (note.getVelocity() != 0) {
+                        resultMap.put("noteState", 0);
+                        resultMap.put("midiNote", ((NoteOn) midiEvent).getNoteValue());
+                    }else {
+                        resultMap.put("noteState", 1);
+                        resultMap.put("midiNote", ((NoteOn) midiEvent).getNoteValue());
+                    }
                     midiEventSink.success(resultMap);
                 } else if (midiEvent instanceof NoteOff) {
                     Map<String, Integer> resultMap = new HashMap<>();
@@ -286,7 +296,6 @@ public class FlutterMidiPlugin implements MethodCallHandler, MidiEventListener, 
 
             }
         };
-        System.out.println(midiProcessor);
         midiProcessor.registerEventListener(midiEventListener, MidiEvent.class);
     }
 
