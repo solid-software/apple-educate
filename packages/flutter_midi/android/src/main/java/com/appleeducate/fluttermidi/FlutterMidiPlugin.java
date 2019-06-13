@@ -48,6 +48,7 @@ public class FlutterMidiPlugin implements MethodCallHandler, MidiEventListener, 
     private MidiProcessor midiProcessor;
     private Result methodResult;
     private MidiEventListener midiEventListener;
+    private final static int DEFAULT_MIDI_VOLUME_LEVEL = 100;
 
 
     public FlutterMidiPlugin() {
@@ -177,6 +178,7 @@ public class FlutterMidiPlugin implements MethodCallHandler, MidiEventListener, 
                 }
 
             }
+            synth.getChannels()[0].controlChange(7, DEFAULT_MIDI_VOLUME_LEVEL);
             result.success(true);
         } else if (call.method.equals("reset_processor")) {
             if (midiProcessor != null) {
