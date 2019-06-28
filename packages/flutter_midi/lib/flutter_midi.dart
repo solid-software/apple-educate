@@ -1,10 +1,11 @@
 import 'dart:async';
 import 'dart:io';
 import 'dart:typed_data';
-import 'package:flutter/material.dart';
 
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_midi/model/midi_event.dart';
+
 import 'local_storage.dart';
 
 class FlutterMidi {
@@ -20,6 +21,14 @@ class FlutterMidi {
     mapData["path"] = _file.path;
     print("Path => ${_file.path}");
     return _channel.invokeMethod('prepare_midi', mapData);
+  }
+
+  static Future prepareMidiFile(Uint8List midiBytes) {
+    return _channel.invokeMethod('prepare_midi_file', {'midi_file': midiBytes});
+  }
+
+  static Future resumeFile() {
+    return _channel.invokeMethod('resume_midi_file');
   }
 
   /// Needed to play midi notes from file presented as [Uint8List]
@@ -79,12 +88,12 @@ class FlutterMidi {
     final String result = await _channel.invokeMethod('unmute');
     return result;
   }
-  
-  static Future<void> changeVolumeLevel(int volumeLevel){
-    _channel.invokeMethod('change_volume_level', {'volume_level' : volumeLevel});
+
+  static Future<void> changeVolumeLevel(int volumeLevel) {
+    _channel.invokeMethod('change_volume_level', {'volume_level': volumeLevel});
   }
 
-  static Future<int> getNoteValue(String note){
+  static Future<int> getNoteValue(String note) {
     return _channel.invokeMethod('get_note_value', {'note_string': note});
   }
 

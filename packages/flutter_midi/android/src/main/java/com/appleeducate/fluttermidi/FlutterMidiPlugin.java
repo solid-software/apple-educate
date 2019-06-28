@@ -34,8 +34,10 @@ import jp.kshoji.javax.sound.midi.Receiver;
 import jp.kshoji.javax.sound.midi.ShortMessage;
 import jp.kshoji.javax.sound.midi.VoiceStatus;
 
+import org.jfugue.MidiRenderer;
 import org.jfugue.MusicStringParser;
 import org.jfugue.Pattern;
+import org.jfugue.extras.Midi2JFugue;
 
 
 /**
@@ -69,154 +71,189 @@ public class FlutterMidiPlugin implements MethodCallHandler, MidiEventListener, 
 
     @Override
     public void onMethodCall(MethodCall call, Result result) {
-        if (call.method.equals("prepare_midi")) {
-            String path = call.argument("path");
-            final Result methodResult = result;
-            AsyncTask<String, String, String> task = new AsyncTask<String, String, String>() {
-                @Override
-                protected String doInBackground(String... strings) {
-                    try {
-                        File _file = new File(strings[0]);
-                        SF2Soundbank sf = new SF2Soundbank(_file);
-                        synth = new SoftSynthesizer();
-                        synth.open();
-                        synth.loadAllInstruments(sf);
-                        synth.getChannels()[0].programChange(0);
-                        synth.getChannels()[1].programChange(1);
-                        recv = synth.getReceiver();
-                    } catch (IOException e) {
-                        e.printStackTrace();
-                    } catch (MidiUnavailableException e) {
-                        e.printStackTrace();
+        switch (call.method) {
+            case "prepare_midi":
+                String path = call.argument("path");
+                final Result finalResult = result;
+                AsyncTask<String, String, String> task = new AsyncTask<String, String, String>() {
+                    @Override
+                    protected String doInBackground(String... strings) {
+                        try {
+                            File _file = new File(strings[0]);
+                            SF2Soundbank sf = new SF2Soundbank(_file);
+                            synth = new SoftSynthesizer();
+                            synth.open();
+                            synth.loadAllInstruments(sf);
+                            synth.getChannels()[0].programChange(0);
+                            synth.getChannels()[1].programChange(1);
+                            recv = synth.getReceiver();
+                        } catch (IOException e) {
+                            e.printStackTrace();
+                        } catch (MidiUnavailableException e) {
+                            e.printStackTrace();
+                        }
+                        return null;
                     }
-                    return null;
-                }
 
-                @Override
-                protected void onPostExecute(String string) {
-                    super.onPostExecute(string);
-                    methodResult.success(true);
-                }
-            };
-            task.execute(path);
-        } else if (call.method.equals("change_sound")) {
-            try {
-                String _path = call.argument("path");
-                File _file = new File(_path);
-                SF2Soundbank sf = new SF2Soundbank(_file);
-                synth = new SoftSynthesizer();
-                synth.open();
-                synth.loadAllInstruments(sf);
-                synth.getChannels()[0].programChange(0);
-                synth.getChannels()[1].programChange(1);
-                recv = synth.getReceiver();
-                result.success(true);
-            } catch (IOException e) {
-                e.printStackTrace();
-            } catch (MidiUnavailableException e) {
-                e.printStackTrace();
-            }
-        } else if (call.method.equals("play_midi_note")) {
-            int _note = call.argument("note");
-            try {
-                ShortMessage msg = new ShortMessage();
-                msg.setMessage(ShortMessage.NOTE_ON, 0, _note, 127);
-                recv.send(msg, -1);
-                result.success(true);
-            } catch (InvalidMidiDataException e) {
-                e.printStackTrace();
-            }
-        } else if (call.method.equals("stop_midi_note")) {
-            int _note = call.argument("note");
-            try {
-                ShortMessage msg = new ShortMessage();
-                msg.setMessage(ShortMessage.NOTE_OFF, 0, _note, 127);
-                recv.send(msg, -1);
-                result.success(true);
-            } catch (InvalidMidiDataException e) {
-                e.printStackTrace();
-            }
-        } else if (call.method.equals("play_midi_file")) {
-            byte[] midiData = call.argument("midi_file");
-            try {
-                InputStream midiInputStream = new ByteArrayInputStream(midiData);
-                MidiFile midiFile = new MidiFile(midiInputStream);
-                if (midiProcessor == null) {
-                    midiProcessor = new MidiProcessor(midiFile);
-                }
-                midiProcessor.registerEventListener(this, NoteOn.class);
-                midiProcessor.registerEventListener(this, EndOfTrack.class);
-                midiProcessor.registerEventListener(this, NoteOff.class);
-                midiProcessor.start();
-                result.success(true);
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-        } else if (call.method.equals("on_file_end")) {
-            methodResult = result;
-        } else if (call.method.equals("stop_playing")) {
-            if (midiProcessor != null && midiProcessor.isRunning()) {
-                midiProcessor.unregisterAllEventListeners();
-                midiProcessor.stop();
-                for (VoiceStatus status : synth.getVoiceStatus()) {
-                    if (!status.active) continue;
-
-                    ShortMessage noteOffMessage = new ShortMessage();
-                    try {
-                        noteOffMessage.setMessage(ShortMessage.NOTE_OFF, status.channel, status.note, 127);
-                        recv.send(noteOffMessage, -1);
-                    } catch (InvalidMidiDataException e) {
-                        e.printStackTrace();
+                    @Override
+                    protected void onPostExecute(String string) {
+                        super.onPostExecute(string);
+                        finalResult.success(true);
                     }
-                }
-                ShortMessage stopMessage = new ShortMessage();
+                };
+                task.execute(path);
+                break;
+            case "change_sound":
                 try {
-                    stopMessage.setMessage(ShortMessage.STOP);
-                    recv.send(stopMessage, -1);
+                    String _path = call.argument("path");
+                    File _file = new File(_path);
+                    SF2Soundbank sf = new SF2Soundbank(_file);
+                    synth = new SoftSynthesizer();
+                    synth.open();
+                    synth.loadAllInstruments(sf);
+                    synth.getChannels()[0].programChange(0);
+                    synth.getChannels()[1].programChange(1);
+                    recv = synth.getReceiver();
+                    result.success(true);
+                } catch (IOException e) {
+                    e.printStackTrace();
+                } catch (MidiUnavailableException e) {
+                    e.printStackTrace();
+                }
+                break;
+            case "play_midi_note": {
+                int _note = call.argument("note");
+                try {
+                    ShortMessage msg = new ShortMessage();
+                    msg.setMessage(ShortMessage.NOTE_ON, 0, _note, 127);
+                    recv.send(msg, -1);
+                    result.success(true);
                 } catch (InvalidMidiDataException e) {
                     e.printStackTrace();
                 }
+                break;
+            }
+            case "stop_midi_note": {
+                int _note = call.argument("note");
+                try {
+                    ShortMessage msg = new ShortMessage();
+                    msg.setMessage(ShortMessage.NOTE_OFF, 0, _note, 127);
+                    recv.send(msg, -1);
+                    result.success(true);
+                } catch (InvalidMidiDataException e) {
+                    e.printStackTrace();
+                }
+                break;
+            }
+            case "prepare_midi_file": {
+                byte[] midiData = call.argument("midi_file");
+                try {
+                    prepareMidiFile(midiData);
+                    result.success(true);
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+                break;
+            }
+            case "resume_midi_file": {
+                midiProcessor.start();
+                result.success(true);
+                break;
+            }
+            case "play_midi_file": {
+                byte[] midiData = call.argument("midi_file");
+                try {
+                    prepareMidiFile(midiData);
+                    midiProcessor.start();
+                    result.success(true);
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+                break;
+            }
+            case "on_file_end":
+                methodResult = result;
+                break;
+            case "stop_playing":
+                if (midiProcessor != null && midiProcessor.isRunning()) {
+                    midiProcessor.unregisterAllEventListeners();
+                    midiProcessor.stop();
+                    for (VoiceStatus status : synth.getVoiceStatus()) {
+                        if (!status.active) continue;
 
-            }
-            synth.getChannels()[0].controlChange(7, DEFAULT_MIDI_VOLUME_LEVEL);
-            result.success(true);
-        } else if (call.method.equals("reset_processor")) {
-            if (midiProcessor != null) {
-                midiProcessor.reset();
-                midiProcessor = null;
-            }
-            result.success(null);
-        } else if (call.method.equals("get_notes")) {
-            byte[] midiData = call.argument("midi_file");
-            try {
-                InputStream midiFileInputStream = new ByteArrayInputStream(midiData);
-                MidiFile midiFile = new MidiFile(midiFileInputStream);
-                List<Integer> midiNotes = new ArrayList<>();
-                int midiTracksCount = midiFile.getTrackCount();
-                if (midiTracksCount > 0) {
-                    Object[] midiEvents = midiFile.getTracks().get(midiTracksCount - 1).getEvents().toArray();
-                    for (Object event : midiEvents) {
-                        if (event instanceof NoteOn) {
-                            midiNotes.add(((NoteOn) event).getNoteValue());
+                        ShortMessage noteOffMessage = new ShortMessage();
+                        try {
+                            noteOffMessage.setMessage(ShortMessage.NOTE_OFF, status.channel, status.note, 127);
+                            recv.send(noteOffMessage, -1);
+                        } catch (InvalidMidiDataException e) {
+                            e.printStackTrace();
                         }
                     }
+                    ShortMessage stopMessage = new ShortMessage();
+                    try {
+                        stopMessage.setMessage(ShortMessage.STOP);
+                        recv.send(stopMessage, -1);
+                    } catch (InvalidMidiDataException e) {
+                        e.printStackTrace();
+                    }
+
                 }
-                result.success(midiNotes);
-            } catch (IOException e) {
-                e.printStackTrace();
+                synth.getChannels()[0].controlChange(7, DEFAULT_MIDI_VOLUME_LEVEL);
+                result.success(true);
+                break;
+            case "reset_processor":
+                if (midiProcessor != null) {
+                    midiProcessor.reset();
+                    midiProcessor = null;
+                }
+                result.success(null);
+                break;
+            case "get_notes": {
+                byte[] midiData = call.argument("midi_file");
+                try {
+                    InputStream midiFileInputStream = new ByteArrayInputStream(midiData);
+                    MidiFile midiFile = new MidiFile(midiFileInputStream);
+                    List<Integer> midiNotes = new ArrayList<>();
+                    int midiTracksCount = midiFile.getTrackCount();
+                    if (midiTracksCount > 0) {
+                        Object[] midiEvents = midiFile.getTracks().get(midiTracksCount - 1).getEvents().toArray();
+                        for (Object event : midiEvents) {
+                            if (event instanceof NoteOn) {
+                                midiNotes.add(((NoteOn) event).getNoteValue());
+                            }
+                        }
+                    }
+                    result.success(midiNotes);
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+                break;
             }
-        } else if (call.method.equals("get_note_value")) {
-            String noteString = call.argument("note_string");
-            NoteEventListener parserListener = new NoteEventListener(result);
-            MusicStringParser parser = new MusicStringParser();
-            parser.addParserListener(parserListener);
-            Pattern pattern = new Pattern(noteString);
-            parser.parse(pattern);
-        } else if (call.method.equals("change_volume_level")) {
-            int volumeLevel = call.argument("volume_level");
-            synth.getChannels()[0].controlChange(7, volumeLevel);
-            result.success(true);
+            case "get_note_value":
+                String noteString = call.argument("note_string");
+                NoteEventListener parserListener = new NoteEventListener(result);
+                MusicStringParser parser = new MusicStringParser();
+                parser.addParserListener(parserListener);
+                Pattern pattern = new Pattern(noteString);
+                parser.parse(pattern);
+                break;
+            case "change_volume_level":
+                int volumeLevel = call.argument("volume_level");
+                synth.getChannels()[0].controlChange(7, volumeLevel);
+                result.success(true);
+                break;
         }
+    }
+
+    private void prepareMidiFile(byte[] midiData) throws IOException {
+        InputStream midiInputStream = new ByteArrayInputStream(midiData);
+        MidiFile midiFile = new MidiFile(midiInputStream);
+        if (midiProcessor == null) {
+            midiProcessor = new MidiProcessor(midiFile);
+        }
+        midiProcessor.registerEventListener(this, NoteOn.class);
+        midiProcessor.registerEventListener(this, EndOfTrack.class);
+        midiProcessor.registerEventListener(this, NoteOff.class);
     }
 
     @Override
