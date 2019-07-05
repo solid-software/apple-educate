@@ -6,7 +6,12 @@ import com.pdrogfer.mididroid.MidiFile;
 import com.pdrogfer.mididroid.event.MidiEvent;
 import com.pdrogfer.mididroid.event.NoteOff;
 import com.pdrogfer.mididroid.event.NoteOn;
+import com.pdrogfer.mididroid.event.ProgramChange;
 import com.pdrogfer.mididroid.event.meta.EndOfTrack;
+import com.pdrogfer.mididroid.event.meta.KeySignature;
+import com.pdrogfer.mididroid.event.meta.Tempo;
+import com.pdrogfer.mididroid.event.meta.TimeSignature;
+import com.pdrogfer.mididroid.util.MetronomeTick;
 import com.pdrogfer.mididroid.util.MidiEventListener;
 import com.pdrogfer.mididroid.util.MidiProcessor;
 
@@ -20,6 +25,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -51,11 +57,7 @@ public class FlutterMidiPlugin implements MethodCallHandler, MidiEventListener, 
     private Result methodResult;
     private MidiEventListener midiEventListener;
     private final static int DEFAULT_MIDI_VOLUME_LEVEL = 100;
-
-
-    public FlutterMidiPlugin() {
-        System.out.println("new instance of class");
-    }
+    private boolean isPaused = false;
 
     /**
      * Plugin registration.
@@ -156,24 +158,22 @@ public class FlutterMidiPlugin implements MethodCallHandler, MidiEventListener, 
                 break;
             }
             case "resume_midi_file": {
+                methodResult = result;
+                midiProcessor.registerEventListener(this, MidiEvent.class);
                 midiProcessor.start();
-                result.success(true);
                 break;
             }
             case "play_midi_file": {
                 byte[] midiData = call.argument("midi_file");
                 try {
                     prepareMidiFile(midiData);
+                    methodResult = result;
                     midiProcessor.start();
-                    result.success(true);
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
                 break;
             }
-            case "on_file_end":
-                methodResult = result;
-                break;
             case "stop_playing":
                 if (midiProcessor != null && midiProcessor.isRunning()) {
                     midiProcessor.unregisterAllEventListeners();
@@ -198,6 +198,7 @@ public class FlutterMidiPlugin implements MethodCallHandler, MidiEventListener, 
                     }
 
                 }
+                isPaused = true;
                 synth.getChannels()[0].controlChange(7, DEFAULT_MIDI_VOLUME_LEVEL);
                 result.success(true);
                 break;
@@ -205,6 +206,7 @@ public class FlutterMidiPlugin implements MethodCallHandler, MidiEventListener, 
                 if (midiProcessor != null) {
                     midiProcessor.reset();
                     midiProcessor = null;
+                    isPaused = false;
                 }
                 result.success(null);
                 break;
@@ -251,18 +253,19 @@ public class FlutterMidiPlugin implements MethodCallHandler, MidiEventListener, 
         if (midiProcessor == null) {
             midiProcessor = new MidiProcessor(midiFile);
         }
-        midiProcessor.registerEventListener(this, NoteOn.class);
-        midiProcessor.registerEventListener(this, EndOfTrack.class);
-        midiProcessor.registerEventListener(this, NoteOff.class);
+        midiProcessor.registerEventListener(this, MidiEvent.class);
     }
 
     @Override
     public void onStart(boolean b) {
-
     }
 
     @Override
     public void onEvent(MidiEvent midiEvent, long l) {
+        if (methodResult != null) {
+            methodResult.success(synth.getLatency());
+            methodResult = null;
+        }
         if (midiEvent instanceof NoteOn) {
             NoteOn note = (NoteOn) midiEvent;
             ShortMessage startMessage = new ShortMessage();
@@ -286,17 +289,7 @@ public class FlutterMidiPlugin implements MethodCallHandler, MidiEventListener, 
 
     @Override
     public void onStop(boolean b) {
-        try {
-            ShortMessage shortMessage = new ShortMessage();
-            shortMessage.setMessage(ShortMessage.STOP);
-            recv.send(shortMessage, -1);
-            if (methodResult != null) {
-                methodResult.success(true);
-                methodResult = null;
-            }
-        } catch (InvalidMidiDataException e) {
-            e.printStackTrace();
-        }
+
     }
 
 

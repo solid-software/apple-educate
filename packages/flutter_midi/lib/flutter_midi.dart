@@ -27,19 +27,16 @@ class FlutterMidi {
     return _channel.invokeMethod('prepare_midi_file', {'midi_file': midiBytes});
   }
 
-  static Future resumeFile() {
-    return _channel.invokeMethod('resume_midi_file');
+  ///Resumes midi files and returns the synsesizer delay in microseconds
+  static Future<int> resumeFile() async {
+    var delay = await _channel.invokeMethod('resume_midi_file');
+    return delay as int;
   }
 
-  /// Needed to play midi notes from file presented as [Uint8List]
-  static Future<void> playFile({@required Uint8List midiData}) {
-    return _channel.invokeMethod("play_midi_file", {"midi_file": midiData});
-  }
-
-  /// Needed to get notified when widi file reaches it's end
-  static void onFileEnd(@required VoidCallback onFileEnded) async {
-    await _channel.invokeMethod('on_file_end');
-    onFileEnded();
+  /// Needed to play midi notes from file presented as [Uint8List] and returns synth delay in microseconds
+  static Future<int> playFile({@required Uint8List midiData}) async {
+    var delay = await _channel.invokeMethod("play_midi_file", {"midi_file": midiData});
+    return delay as int;
   }
 
   /// Needed to stop playind midi notes from file and reset midi processor
@@ -63,8 +60,8 @@ class FlutterMidi {
   }
 
   /// Fetches all notes from midi file
-  static Future<List<int>> getNotesFormFile(Uint8List midiFile) async{
-    var notesList = await _channel.invokeMethod("get_notes", {'midi_file' : midiFile});
+  static Future<List<int>> getNotesFormFile(Uint8List midiFile) async {
+    var notesList = await _channel.invokeMethod("get_notes", {'midi_file': midiFile});
     return List<int>.from(notesList);
   }
 
