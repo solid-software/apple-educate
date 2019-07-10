@@ -158,9 +158,17 @@ public class FlutterMidiPlugin implements MethodCallHandler, MidiEventListener, 
                 break;
             }
             case "resume_midi_file": {
-                methodResult = result;
+                boolean paused = call.argument("paused");
+                if (midiProcessor == null) {
+                    result.success(null);
+                    return;
+                }
+                if (!paused) {
+                    methodResult = result;
+                }
                 midiProcessor.registerEventListener(this, MidiEvent.class);
                 midiProcessor.start();
+                if (paused) result.success(synth.getLatency());
                 break;
             }
             case "play_midi_file": {
@@ -176,8 +184,6 @@ public class FlutterMidiPlugin implements MethodCallHandler, MidiEventListener, 
             }
             case "stop_playing":
                 if (midiProcessor != null && midiProcessor.isRunning()) {
-                    midiProcessor.unregisterAllEventListeners();
-                    midiProcessor.stop();
                     for (VoiceStatus status : synth.getVoiceStatus()) {
                         if (!status.active) continue;
 
@@ -196,7 +202,8 @@ public class FlutterMidiPlugin implements MethodCallHandler, MidiEventListener, 
                     } catch (InvalidMidiDataException e) {
                         e.printStackTrace();
                     }
-
+                    midiProcessor.unregisterAllEventListeners();
+                    midiProcessor.stop();
                 }
                 isPaused = true;
                 synth.getChannels()[0].controlChange(7, DEFAULT_MIDI_VOLUME_LEVEL);

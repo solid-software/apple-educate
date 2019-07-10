@@ -28,8 +28,8 @@ class FlutterMidi {
   }
 
   ///Resumes midi files and returns the synsesizer delay in microseconds
-  static Future<int> resumeFile() async {
-    var delay = await _channel.invokeMethod('resume_midi_file');
+  static Future<int> resumeFile({bool paused = false}) async {
+    var delay = await _channel.invokeMethod('resume_midi_file', {'paused' : paused});
     return delay as int;
   }
 
