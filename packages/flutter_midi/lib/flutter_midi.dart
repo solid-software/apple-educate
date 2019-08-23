@@ -29,7 +29,7 @@ class FlutterMidi {
 
   ///Resumes midi files and returns the synsesizer delay in microseconds
   static Future<int> resumeFile({bool paused = false}) async {
-    var delay = await _channel.invokeMethod('resume_midi_file', {'paused' : paused});
+    var delay = await _channel.invokeMethod('resume_midi_file', {'paused': paused});
     return delay as int;
   }
 
@@ -86,8 +86,8 @@ class FlutterMidi {
     return result;
   }
 
-  static Future<void> changeVolumeLevel(int volumeLevel) {
-    _channel.invokeMethod('change_volume_level', {'volume_level': volumeLevel});
+  static Future<void> changeVolumeLevel(int volumeLevel) async{
+    await _channel.invokeMethod('change_volume_level', {'volume_level': volumeLevel});
   }
 
   static Future<int> getNoteValue(String note) {
@@ -96,20 +96,19 @@ class FlutterMidi {
 
   /// Use this when stopping the sound onTouchUp or to cancel a long file.
   /// Not needed if playing midi onTap.
-  static Future<String> stopMidiNote({
+  static Future stopMidiNote({
     @required int midi,
   }) async {
     final Map<dynamic, dynamic> mapData = <dynamic, dynamic>{};
     print("Pressed: $midi");
     mapData["note"] = midi;
-    final String result = await _channel.invokeMethod('stop_midi_note', mapData);
-    return result;
+    await _channel.invokeMethod('stop_midi_note', mapData);
   }
 
   /// Play a midi note from the sound_font.SF2 library bundled with the application.
   /// Play a midi note in the range between 0-256
   /// Multiple notes can be played at once as seperate calls.
-  static Future<String> playMidiNote({
+  static Future playMidiNote({
     @required int midi,
   }) async {
     final Map<dynamic, dynamic> mapData = <dynamic, dynamic>{};
