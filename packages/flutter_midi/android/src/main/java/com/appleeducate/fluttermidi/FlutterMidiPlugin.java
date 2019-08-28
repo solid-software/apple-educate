@@ -3,47 +3,43 @@ package com.appleeducate.fluttermidi;
 import android.os.AsyncTask;
 
 import com.pdrogfer.mididroid.MidiFile;
+import com.pdrogfer.mididroid.MidiTrack;
 import com.pdrogfer.mididroid.event.MidiEvent;
 import com.pdrogfer.mididroid.event.NoteOff;
 import com.pdrogfer.mididroid.event.NoteOn;
-import com.pdrogfer.mididroid.event.ProgramChange;
 import com.pdrogfer.mididroid.event.meta.EndOfTrack;
 import com.pdrogfer.mididroid.event.meta.KeySignature;
 import com.pdrogfer.mididroid.event.meta.Tempo;
 import com.pdrogfer.mididroid.event.meta.TimeSignature;
-import com.pdrogfer.mididroid.util.MetronomeTick;
 import com.pdrogfer.mididroid.util.MidiEventListener;
 import com.pdrogfer.mididroid.util.MidiProcessor;
 
-import io.flutter.plugin.common.EventChannel;
-import io.flutter.plugin.common.MethodChannel;
-import io.flutter.plugin.common.MethodChannel.Result;
-import io.flutter.plugin.common.PluginRegistry.Registrar;
+import org.jfugue.MusicStringParser;
+import org.jfugue.Pattern;
 
 import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
-import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import cn.sherlock.com.sun.media.sound.SF2Soundbank;
 import cn.sherlock.com.sun.media.sound.SoftSynthesizer;
+import io.flutter.plugin.common.EventChannel;
 import io.flutter.plugin.common.MethodCall;
+import io.flutter.plugin.common.MethodChannel;
 import io.flutter.plugin.common.MethodChannel.MethodCallHandler;
+import io.flutter.plugin.common.MethodChannel.Result;
+import io.flutter.plugin.common.PluginRegistry.Registrar;
 import jp.kshoji.javax.sound.midi.InvalidMidiDataException;
 import jp.kshoji.javax.sound.midi.MidiUnavailableException;
 import jp.kshoji.javax.sound.midi.Receiver;
 import jp.kshoji.javax.sound.midi.ShortMessage;
 import jp.kshoji.javax.sound.midi.VoiceStatus;
-
-import org.jfugue.MidiRenderer;
-import org.jfugue.MusicStringParser;
-import org.jfugue.Pattern;
-import org.jfugue.extras.Midi2JFugue;
 
 
 /**
@@ -51,13 +47,14 @@ import org.jfugue.extras.Midi2JFugue;
  */
 
 public class FlutterMidiPlugin implements MethodCallHandler, MidiEventListener, EventChannel.StreamHandler {
+    private final static int DEFAULT_MIDI_VOLUME_LEVEL = 100;
     private SoftSynthesizer synth;
     private Receiver recv;
     private MidiProcessor midiProcessor;
     private Result methodResult;
     private MidiEventListener midiEventListener;
-    private final static int DEFAULT_MIDI_VOLUME_LEVEL = 100;
     private boolean isPaused = false;
+    private MidiFile midiFile;
 
     /**
      * Plugin registration.
@@ -182,6 +179,14 @@ public class FlutterMidiPlugin implements MethodCallHandler, MidiEventListener, 
                 }
                 break;
             }
+            case "seek": {
+                double percent = call.argument("percent");
+
+                seek(percent);
+
+                result.success(true);
+                break;
+            }
             case "stop_playing":
                 if (midiProcessor != null && midiProcessor.isRunning()) {
                     for (VoiceStatus status : synth.getVoiceStatus()) {
@@ -254,12 +259,92 @@ public class FlutterMidiPlugin implements MethodCallHandler, MidiEventListener, 
         }
     }
 
+    private void seek(double percent) {
+        List<MidiTrack> tracks = midiFile.getTracks();
+
+        for (int i = 0; i < tracks.size(); i++) {
+            MidiTrack track = tracks.get(i);
+
+            long length = track.getLengthInTicks();
+            double startTick = length * percent;
+            Set<MidiEvent> events = track.getEvents();
+            MidiTrack newTrack = new MidiTrack();
+
+            NoteOff firstNoteOff = null;
+            NoteOn firstNoteOn = null;
+
+            for (MidiEvent event : events) {
+                if (event.getTick() < startTick) continue;
+
+                long newTick = (long) (event.getTick() - startTick);
+                long delta = event.getDelta();
+
+                if (event instanceof NoteOn) {
+                    NoteOn noteOnEvent = (NoteOn) event;
+
+                    NoteOn newNoteOn = new NoteOn(newTick, delta, noteOnEvent.getChannel(), noteOnEvent.getNoteValue(), noteOnEvent.getVelocity());
+                    newTrack.insertEvent(newNoteOn);
+
+                    if (firstNoteOn == null) {
+                        firstNoteOn = newNoteOn;
+                    }
+
+                } else if (event instanceof NoteOff) {
+                    NoteOff noteOffEvent = (NoteOff) event;
+
+                    NoteOff newNoteOff = new NoteOff(newTick, delta, noteOffEvent.getChannel(), noteOffEvent.getNoteValue(), noteOffEvent.getVelocity());
+                    newTrack.insertEvent(newNoteOff);
+
+                    if (firstNoteOff == null) {
+                        firstNoteOff = newNoteOff;
+                    }
+
+                } else if (event instanceof Tempo) {
+                    Tempo tempoEvent = (Tempo) event;
+                    Tempo newTempoEvent = new Tempo(newTick, delta, tempoEvent.getMpqn());
+
+                    newTrack.insertEvent(newTempoEvent);
+                } else if (event instanceof TimeSignature) {
+                    TimeSignature timeSignature = (TimeSignature) event;
+                    TimeSignature newTimeSignature = new TimeSignature(newTick, delta, timeSignature.getNumerator(), timeSignature.getDenominatorValue(), timeSignature.getMeter(), timeSignature.getDivision());
+
+                    newTrack.insertEvent(newTimeSignature);
+                } else if (event instanceof KeySignature) {
+                    KeySignature key = (KeySignature) event;
+                    KeySignature newKey = new KeySignature(newTick, delta, key.getKey(), key.getScale());
+
+                    newTrack.insertEvent(newKey);
+                } else if (event instanceof EndOfTrack) {
+                    EndOfTrack newEnd = new EndOfTrack(event.getTick(), delta);
+                    newTrack.insertEvent(newEnd);
+                }
+            }
+
+
+            if (firstNoteOn != null && firstNoteOff != null && firstNoteOn.getTick() >= firstNoteOff.getTick() && firstNoteOff.getTick() > 0) {
+                NoteOn noteOn = new NoteOn((long) 0, firstNoteOff.getChannel(), firstNoteOff.getNoteValue(), firstNoteOn.getVelocity());
+
+                newTrack.insertEvent(noteOn);
+            }
+
+
+            midiFile.removeTrack(i);
+            midiFile.addTrack(newTrack, i);
+        }
+
+        midiProcessor = new MidiProcessor(midiFile);
+        midiProcessor.registerEventListener(this, MidiEvent.class);
+    }
+
     private void prepareMidiFile(byte[] midiData) throws IOException {
         InputStream midiInputStream = new ByteArrayInputStream(midiData);
-        MidiFile midiFile = new MidiFile(midiInputStream);
+        midiFile = new MidiFile(midiInputStream);
+
         if (midiProcessor == null) {
             midiProcessor = new MidiProcessor(midiFile);
         }
+        midiProcessor.reset();
+
         midiProcessor.registerEventListener(this, MidiEvent.class);
     }
 

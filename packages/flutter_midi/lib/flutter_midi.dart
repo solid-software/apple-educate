@@ -19,7 +19,6 @@ class FlutterMidi {
 
     final Map<dynamic, dynamic> mapData = <dynamic, dynamic>{};
     mapData["path"] = _file.path;
-    print("Path => ${_file.path}");
     return _channel.invokeMethod('prepare_midi', mapData);
   }
 
@@ -74,9 +73,7 @@ class FlutterMidi {
 
     final Map<dynamic, dynamic> mapData = <dynamic, dynamic>{};
     mapData["path"] = _file.path;
-    print("Path => ${_file.path}");
     final String result = await _channel.invokeMethod('change_sound', mapData);
-    print("Result: $result");
     return result;
   }
 
@@ -100,9 +97,12 @@ class FlutterMidi {
     @required int midi,
   }) async {
     final Map<dynamic, dynamic> mapData = <dynamic, dynamic>{};
-    print("Pressed: $midi");
     mapData["note"] = midi;
     await _channel.invokeMethod('stop_midi_note', mapData);
+  }
+
+  static Future seek(double position) async{
+    await _channel.invokeMethod('seek', {'percent' : position});
   }
 
   /// Play a midi note from the sound_font.SF2 library bundled with the application.
@@ -112,7 +112,6 @@ class FlutterMidi {
     @required int midi,
   }) async {
     final Map<dynamic, dynamic> mapData = <dynamic, dynamic>{};
-    print("Pressed: $midi");
     mapData["note"] = midi;
     return await _channel.invokeMethod('play_midi_note', mapData);
   }
